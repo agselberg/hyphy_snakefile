@@ -1,0 +1,17 @@
+{
+    "trees" : "included_species",
+
+    "hyphy" : "/home/agselberg/hyphy-develop/hyphy", 
+    "hyphy-analyses" : "/home/agselberg/hyphy-analyses",
+    "hyphympi" : "/home/agselberg/hyphy-develop/HYPHYMPI",
+    "res" : "/home/agselberg/hyphy-develop/res",
+
+    "msa_directory" : "/home/agselberg/snakemake_sample/seqs",
+    "tree_directory" : "/home/agselberg/snakemake_sample/trees",
+    "trait_directory" : "/home/agselberg/snakemake_sample/traits",
+
+    "msa_extension" : "fasta",
+    "tree_extension" : "nwk",
+    "trait_extension" : "txt",
+	"results_directory" : "/home/agselberg/snakemake_sample/results"
+}
