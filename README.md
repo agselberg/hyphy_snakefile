@@ -8,7 +8,7 @@ Use the following commands before beginning:
 `conda activate HYPHY_SNAKEMAKE`
 
 ### Step 2: Set config 
-- Specify if gene trees will be used ('included_gene'), or if one master species will be used('included_species'), or if raxml will be used to make new gene trees ('raxml'). 
+- Specify if gene trees will be used ("trees" : "included_species"), or if one master species will be used("trees" : "included_species"), or if raxml will be used to make new gene trees ("trees" : "raxml"). 
 - Please use unlabled tree files with corresponding trait files.
 - Set full paths for hyphy files and data directories, set extensions for data files.
 
