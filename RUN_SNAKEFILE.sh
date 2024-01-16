@@ -27,7 +27,7 @@ elif [ "$trees_value" == "included_species" ]; then
 	echo -e "$tree_dir \n$tree_ext"
 	nwk_files=($(find "$tree_dir" -type f -name "*$tree_ext"))
 	echo "$nwk_files"
-	python /home/agselberg/pollock/scripts/clean-tree.py "$nwk_files" "$tree_dir/species_cleaned.$tree_ext"
+	python scripts/clean-tree.py "$nwk_files" "$tree_dir/species_cleaned.$tree_ext"
 	
 elif [ "$trees_value" == "raxml" ]; then
     Snakefile="Snakefile_raxml"

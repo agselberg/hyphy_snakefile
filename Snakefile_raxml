@@ -86,7 +86,7 @@ rule clean_fasta:
         seq = os.path.join(OUTDIR, "{GENE}.cleaned.fa")
     shell:
          """
-         python /home/agselberg/pollock/scripts/clean-fasta.py {input.seq} {output.seq}
+         python scripts/clean-fasta.py {input.seq} {output.seq}
          """
 ###end rule 
 
@@ -146,7 +146,7 @@ rule clean_trait:
         trait = os.path.join(OUTDIR, "{GENE}.cleaned.txt")
     shell:
          """
-         python /home/agselberg/pollock/scripts/clean-trait.py {input.trait} {output.trait}
+         python scripts/clean-trait.py {input.trait} {output.trait}
          """
 ###end rule 
 
