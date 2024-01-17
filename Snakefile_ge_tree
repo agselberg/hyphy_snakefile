@@ -1,6 +1,9 @@
 """
-BUSTED-PH SNAKEFILE TO RUN OG BUSTED TO EMULATE BUSTED-PH
-USED BUSTED'S 'ERROR SINK MODE' 
+SNAKEFILE TO RUN BASIC HYPHY METHODS INCLUDING:
+BUSTED-E, BUSTED-PH, Contrast-FEL, aBSREL, MEME, RELAX
+
+HERE WE ASSUME THE USER IS PROVIDING THERE OWN TREES, 
+ONE GENE TREE FOR EVERY FASTA FILE WITH CORRESPONDING BASENAMES
 
 @Author: Avery Selberg
 
@@ -55,7 +58,7 @@ BS_bf = os.path.join(HYPHY_ANALYSES, "PAML-emulator", "BranchSite.bf")
 Path(OUTDIR).mkdir(parents=True, exist_ok=True)
 
 # setting for MPI
-#PPN = cluster["__default__"]["ppn"] 
+PPN = cluster["__default__"]["ppn"] 
 
 
 #---------------------------------------------------------------------------- 
@@ -67,9 +70,9 @@ rule all:
 		expand(os.path.join(OUTDIR, "{GENE}.FILTER.fas"), GENE = GENE_LIST),			## BUSTED-E
 		expand(os.path.join(OUTDIR, "{GENE}.BUSTEDPH.json"), GENE = GENE_LIST),			## BUSTED-PH
 		expand(os.path.join(OUTDIR, "{GENE}.MEME.json"), GENE = GENE_LIST), 			## MEME
-        expand(os.path.join(OUTDIR, "{GENE}.ABSREL.json"), GENE = GENE_LIST),			## ABSREL
-        expand(os.path.join(OUTDIR, "{GENE}.contrast-fel.json"), GENE = GENE_LIST),		## CONTRAST-FEL
-        expand(os.path.join(OUTDIR, "{GENE}.RELAX.json"), GENE = GENE_LIST)				## RELAX
+		expand(os.path.join(OUTDIR, "{GENE}.ABSREL.json"), GENE = GENE_LIST),			## ABSREL
+		expand(os.path.join(OUTDIR, "{GENE}.contrast-fel.json"), GENE = GENE_LIST),		## CONTRAST-FEL
+		expand(os.path.join(OUTDIR, "{GENE}.RELAX.json"), GENE = GENE_LIST)				## RELAX
  #end input 
 #end rule 
 

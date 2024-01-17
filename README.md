@@ -18,12 +18,19 @@ Use the following commands to set up the conda environment before starting the a
 `conda activate HYPHY_SNAKEMAKE`
 
 ### Step 3: Set config 
-- Specify if gene trees will be used ("trees" : "included_species"), or if one master species will be used("trees" : "included_species"), or if raxml will be used to make new gene trees ("trees" : "raxml"). 
-- Please use unlabled tree files with corresponding trait files.
-- Set full paths for hyphy files and data directories, set extensions for data files.
+1. Set full paths for hyphy files and data directories, set extensions for data files.
+2. Specify if gene trees or species trees will be used:
+- GENE TREES:
+	- Update config file to `"trees" : "included_species"`
+	- Include one gene tree for each msa file with the same basename (ex: gene1.fasta and gene1.nwk)
+- SPECIES TREES:
+	- Update config file to `"trees" : "included_species"`
+	- There should be one species tree in the specified tree directory
+- BUILD TREES:
+	- Update config file to `"trees" : "raxml"
 
 ### Step 4: Choose HyPhy models to run
-The specified snakefile will run the following models: BUSTED-E, BUSTED-PH, Contrast-FEL, aBSREL, MEME, RELAX. To skip a model, comment out in rule all in the Snakefile. 
+The specified snakefile will run the following models: BUSTED-E, BUSTED-PH, Contrast-FEL, aBSREL, MEME, RELAX. To skip a model, comment out undesired models in `rule all` in the Snakefile. 
 
 ### Step 5: 
 Run Snakemake:
