@@ -1,7 +1,7 @@
 # SNAKEFILE TO USE FOR BASIC HYPHY ANALYSES
 
-## This application is currently designed to run in an HPC environment.
-## There is an assumption that the freely availible [Anaconda](https://anaconda.org/) has been installed on your machine, as well as [HyPhy (MPI enabled)](https://github.com/veg/hyphy).
+### This application is currently designed to run in an HPC environment.
+### There is an assumption that the freely availible [Anaconda](https://anaconda.org/) software has been installed on your machine, as well as the [HyPhy (MPI enabled)](https://github.com/veg/hyphy) package.
 
 To install: 
 
