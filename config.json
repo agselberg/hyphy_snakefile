@@ -1,10 +1,10 @@
 {
 	"trees" : "included_gene",
 	
-	"hyphy" : "/home/agselberg/hyphy-develop/hyphy", 
+	"hyphy" : "/home/agselberg/hyphy/hyphy", 
 	"hyphy-analyses" : "/home/agselberg/hyphy-analyses",
 	"hyphympi" : "/home/agselberg/hyphy-develop/HYPHYMPI",
-	"res" : "/home/agselberg/hyphy-develop/res",
+	"res" : "/home/agselberg/hyphy/res",
 	
 	"msa_directory" : "/home/agselberg/snakemake_sample/seqs",
 	"tree_directory" : "/home/agselberg/snakemake_sample/trees",
