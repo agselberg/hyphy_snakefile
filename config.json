@@ -1,5 +1,5 @@
 {
-	"trees" : "included_species",
+	"trees" : "included_gene",
 	
 	"hyphy" : "/home/agselberg/hyphy-develop/hyphy", 
 	"hyphy-analyses" : "/home/agselberg/hyphy-analyses",

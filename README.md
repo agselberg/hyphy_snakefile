@@ -21,7 +21,7 @@ Use the following commands to set up the conda environment before starting the a
 1. Set full paths for hyphy files and data directories, set extensions for data files.
 2. Specify if gene trees or species trees will be used:
 - GENE TREES:
-	- Update config file to `"trees" : "included_species"`
+	- Update config file to `"trees" : "included_gene"`
 	- Include one gene tree for each msa file with the same basename (ex: gene1.fasta and gene1.nwk)
 - SPECIES TREES:
 	- Update config file to `"trees" : "included_species"`
