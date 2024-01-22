@@ -1,0 +1,254 @@
+"""
+SNAKEFILE TO RUN BASIC HYPHY METHODS INCLUDING:
+BUSTED-E, BUSTED-PH, Contrast-FEL, aBSREL, MEME, RELAX
+
+HERE WE ASSUME THAT THE USER PROVIES A SINGLE SPECIES TREE
+THAT CORRESPONDS TO EACH OF THE MSA FILES
+
+@Author: Avery Selberg
+
+2023
+"""
+
+#----------------------------------------------------------------------------
+# Description
+#----------------------------------------------------------------------------
+import os
+import sys
+import json
+import csv
+from pathlib import Path
+import glob
+#----------------------------------------------------------------------------
+# Declares
+#----------------------------------------------------------------------------
+
+with open('config.json', 'r') as input_cf:
+	config = json.load(input_cf)
+with open("cluster.json", "r") as in_c:
+  cluster = json.load(in_c)
+
+#----------------------------------------------------------------------------
+# Settings
+#----------------------------------------------------------------------------
+
+
+cwd = os.getcwd()
+home_dir = os.path.expanduser("~")
+
+# setting for MPI
+PPN = cluster["__default__"]["ppn"]
+
+# Which project are we analyzing?
+MSA_DIRECTORY = os.path.join(cwd, config["msa_directory"])
+MSA_EXT = config['msa_extension']
+TREE_DIRECTORY = os.path.join(cwd, config['tree_directory'])
+TREE_EXT = config['tree_extension']
+TRAIT_DIRECTORY = os.path.join(cwd, config['trait_directory'])
+TRAIT_EXT = config['trait_extension']
+OUTDIR = os.path.join(cwd, config["results_directory"])
+
+GENE_LIST = [os.path.splitext(os.path.basename(x))[0] for x in glob.glob(os.path.join(MSA_DIRECTORY, "*." + MSA_EXT))]
+SPECIES_TREE =[x for x in glob.glob(os.path.join(TREE_DIRECTORY, "*." + TREE_EXT))][0]
+#print("SPECIES_TREE", SPECIES_TREE)
+#print("GENE_LIST", GENE_LIST)
+
+
+HYPHY    = os.path.join(home_dir, "hyphy-develop", "hyphy")
+RES      = os.path.join(home_dir, "hyphy-develop", "res")
+HYPHY_ANALYSES = os.path.join(home_dir, "hyphy-analyses")
+if os.path.exists(os.path.join(home_dir, "hyphy-develop", "HYPHYMPI")):
+        HYPHYMPI =  "mpirun -np " + str(PPN) + " " + os.path.join(home_dir, "hyphy-develop", "HYPHYMPI")
+else:
+        HYPHYMPI = HYPHY
+print(HYPHYMPI)
+
+BUSTED_PH_BF = os.path.join(HYPHY_ANALYSES, "BUSTED-PH", "BUSTED-PH.bf")
+LAB_bf = os.path.join(HYPHY_ANALYSES, "LabelTrees", "label-tree.bf")
+
+# Create output directories
+Path(OUTDIR).mkdir(parents=True, exist_ok=True)
+
+
+#---------------------------------------------------------------------------- 
+# rule all
+#----------------------------------------------------------------------------
+
+rule all:
+	input: 
+		expand(os.path.join(OUTDIR, "{GENE}.FILTER.fas"), GENE = GENE_LIST),			## BUSTED-E
+		expand(os.path.join(OUTDIR, "{GENE}.BUSTEDPH.json"), GENE = GENE_LIST),			## BUSTED-PH
+		expand(os.path.join(OUTDIR, "{GENE}.MEME.json"), GENE = GENE_LIST), 			## MEME
+        expand(os.path.join(OUTDIR, "{GENE}.ABSREL.json"), GENE = GENE_LIST),			## ABSREL
+        expand(os.path.join(OUTDIR, "{GENE}.contrast-fel.json"), GENE = GENE_LIST),		## CONTRAST-FEL
+        expand(os.path.join(OUTDIR, "{GENE}.RELAX.json"), GENE = GENE_LIST)				## RELAX
+ #end input 
+#end rule 
+
+
+
+#---------------------------------------------------------------------------- 
+# Clean trees and fastas to remove hyphens in the name
+#---------------------------------------------------------------------------- 
+## REMOVE HYPHENS FROM FASTA##
+rule clean_fasta:
+    input:
+        seq = os.path.join(MSA_DIRECTORY, "{GENE}." + MSA_EXT)
+    output:
+        seq = os.path.join(OUTDIR, "{GENE}.cleaned.fa")
+    shell:
+         """
+         python scripts/clean-fasta.py {input.seq} {output.seq}
+         """
+###end rule 
+
+#---------------------------------------------------------------------------- 
+# Run BUSTED WITH ERROR SINK COMPONENT THEN HMM
+#---------------------------------------------------------------------------- 
+
+## RUN BUSTED-E ON ALL BRANCHES##
+rule busted_e:
+    input:
+        seq = rules.clean_fasta.output.seq,
+        tree = SPECIES_TREE
+    output:
+        json = os.path.join(OUTDIR, "{GENE}.BUSTED-E.json"), 
+        fits = os.path.join(OUTDIR, "{GENE}.BUSTED-E-fit.lf")
+    shell:
+         """
+         {HYPHY} LIBPATH={RES} BUSTED --alignment {input.seq} --tree {input.tree} --srv Yes --starting-points 5 --output {output.json} --error-sink Yes --save-fit {output.fits}
+         """
+###end rule 
+
+rule filter:
+    input:
+        e_json = rules.busted_e.output.json
+    output:
+        json = os.path.join(OUTDIR, "{GENE}.FILTER.json"), 
+        seq = os.path.join(OUTDIR, "{GENE}.FILTER.fas")
+    shell:
+         """
+         {HYPHY} LIBPATH={RES} error-filter {input.e_json} --output {output.seq} --output-json {output.json}
+         """
+###end rule 
+
+#---------------------------------------------------------------------------- 
+# Run BUSTED-PH
+#---------------------------------------------------------------------------- 
+
+
+## CLEAN TRAITS FOR BUSTED-PH##
+rule clean_trait:
+    input:
+        trait = os.path.join(TRAIT_DIRECTORY, "{GENE}." + TRAIT_EXT)
+    output:
+        trait = os.path.join(OUTDIR, "{GENE}.cleaned.txt")
+    shell:
+         """
+         python scripts/clean-trait.py {input.trait} {output.trait}
+         """
+###end rule 
+
+## RUN LABEL TREES FOR BUSTED-PH##
+rule label_tree:
+    input:
+        trait = rules.clean_trait.output.trait,
+        tree = SPECIES_TREE
+    output:
+        tree = os.path.join(OUTDIR, "{GENE}.labeled.nwk")
+    shell:
+         """
+         {HYPHY} LIBPATH={RES} {LAB_bf} --tree {input.tree} --list {input.trait} --output {output.tree} 
+         """
+###end rule 
+
+rule busted_ph:
+    input:
+        tree = rules.label_tree.output.tree,
+        seq = rules.filter.output.seq								########### UNCOMMENT THIS LINE IF USING FILTERED FASTA
+        #seq = rules.clean_fasta.output.seq							########### UNCOMMENT THIS LINE IF USING UNFILTERED FASTA
+    output:
+        json = os.path.join(OUTDIR, "{GENE}.BUSTEDPH.json")
+    shell:
+         """
+         {HYPHY} LIBPATH={RES} {BUSTED_PH_BF} --alignment {input.seq} --tree {input.tree} --output {output.json} --branches Foreground
+         """
+###end rule 
+
+#---------------------------------------------------------------------------- 
+# Run MEME
+#---------------------------------------------------------------------------- 
+
+
+rule meme:
+    input:
+        seq = rules.filter.output.seq,
+        tree = SPECIES_TREE
+    output:
+        json = os.path.join(OUTDIR, "{GENE}.MEME.json") 
+    shell:
+         """
+         {HYPHYMPI} LIBPATH={RES} MEME --alignment {input.seq} --tree {input.tree} --srv Yes --starting-points 5 --output {output.json} 
+         """
+
+
+###end rule
+#---------------------------------------------------------------------------- 
+# Run ABSREL
+#---------------------------------------------------------------------------- 
+
+
+rule absrel:
+    input:
+        seq = rules.filter.output.seq,
+        tree = SPECIES_TREE
+    output:
+        json = os.path.join(OUTDIR, "{GENE}.ABSREL.json")
+    shell:
+         """
+         {HYPHYMPI} LIBPATH={RES} ABSREL --alignment {input.seq} --tree {input.tree} --srv Yes --starting-points 5 --output {output.json} 
+         """
+
+
+###end rule
+#---------------------------------------------------------------------------- 
+# Run contrast-FEL
+#---------------------------------------------------------------------------- 
+
+
+rule contrast_fel:
+    input:
+        seq = rules.filter.output.seq,
+        tree = rules.label_tree.output.tree,
+    output:
+        json = os.path.join(OUTDIR, "{GENE}.contrast-fel.json")
+    shell:
+         """
+         {HYPHYMPI} LIBPATH={RES} CONTRAST-FEL --alignment {input.seq} --tree {input.tree} --srv Yes --starting-points 5 --output {output.json} --branch-set Foreground
+         """
+
+
+###end rule
+#---------------------------------------------------------------------------- 
+# Run RELAX
+#---------------------------------------------------------------------------- 
+
+
+rule relax:
+    input:
+        seq = rules.filter.output.seq,
+        tree = rules.label_tree.output.tree
+    output:
+        json = os.path.join(OUTDIR, "{GENE}.RELAX.json"), 
+    shell:
+         """
+         {HYPHYMPI} LIBPATH={RES} RELAX --alignment {input.seq} --tree {input.tree} --srv Yes --starting-points 5 --output {output.json} --test Foreground
+         """
+
+
+###end rule
+#----------------------------------------------------------------------------
+# End of file
+#----------------------------------------------------------------------------
+
+

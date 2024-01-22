@@ -32,33 +32,39 @@ with open("cluster.json", "r") as in_c:
 # Settings
 #----------------------------------------------------------------------------
 
+cwd = os.getcwd()
+home_dir = os.path.expanduser("~")
+
+# setting for MPI
+PPN = cluster["__default__"]["ppn"] 
+
 # Which project are we analyzing?
-MSA_DIRECTORY = config["msa_directory"]
+MSA_DIRECTORY = os.path.join(cwd, config["msa_directory"])
 MSA_EXT = config['msa_extension']
+TREE_DIRECTORY = os.path.join(cwd, config['tree_directory'])
 TREE_EXT = config['tree_extension']
-TREE_DIRECTORY = config['tree_directory']
+TRAIT_DIRECTORY = os.path.join(cwd, config['trait_directory'])
 TRAIT_EXT = config['trait_extension']
-TRAIT_DIRECTORY = config['trait_directory']
-OUTDIR = config["results_directory"] 
+OUTDIR = os.path.join(cwd, config["results_directory"])
 
 GENE_LIST = [os.path.splitext(os.path.basename(x))[0] for x in glob.glob(os.path.join(MSA_DIRECTORY, "*." + MSA_EXT))]
-print(GENE_LIST)
 
 
-HYPHY    = config["hyphy"]
-RES      = config["res"]
-HYPHY_ANALYSES = config["hyphy-analyses"]
+HYPHY    = os.path.join(home_dir, "hyphy-develop", "hyphy")
+RES      = os.path.join(home_dir, "hyphy-develop", "res")
+HYPHY_ANALYSES = os.path.join(home_dir, "hyphy-analyses")
+if os.path.exists(os.path.join(home_dir, "hyphy-develop", "HYPHYMPI")):
+	HYPHYMPI =  "mpirun -np " + str(PPN) + " " + os.path.join(home_dir, "hyphy-develop", "HYPHYMPI")
+else:
+	HYPHYMPI = HYPHY
+print(HYPHYMPI)
 
 BUSTED_PH_BF = os.path.join(HYPHY_ANALYSES, "BUSTED-PH", "BUSTED-PH.bf")
 LAB_bf = os.path.join(HYPHY_ANALYSES, "LabelTrees", "label-tree.bf")
-CMC_bf = os.path.join(HYPHY_ANALYSES, "PAML-emulator", "CMC.bf")
-BS_bf = os.path.join(HYPHY_ANALYSES, "PAML-emulator", "BranchSite.bf")
 
 # Create output directories
 Path(OUTDIR).mkdir(parents=True, exist_ok=True)
 
-# setting for MPI
-PPN = cluster["__default__"]["ppn"] 
 
 
 #---------------------------------------------------------------------------- 
@@ -83,14 +89,16 @@ rule all:
 #---------------------------------------------------------------------------- 
 ## REMOVE HYPHENS FROM FASTA##
 rule clean_fasta:
-    input:
-        seq = os.path.join(MSA_DIRECTORY, "{GENE}." + MSA_EXT)
-    output:
-        seq = os.path.join(OUTDIR, "{GENE}.cleaned.fa")
-    shell:
-         """
-         python scripts/clean-fasta.py {input.seq} {output.seq}
-         """
+	input:
+		seq = os.path.join(MSA_DIRECTORY, "{GENE}." + MSA_EXT)
+	output:
+		seq = os.path.join(OUTDIR, "{GENE}.cleaned.fa")
+	conda:
+		"environment.yml"	
+	shell:
+		"""
+		python scripts/clean-fasta.py {input.seq} {output.seq}
+		"""
 ###end rule 
 
 ## REMOVE HYPHENS FROM TREES##
@@ -101,6 +109,8 @@ rule raxml:
 		seq = rules.clean_fasta.output.seq
 	output:
 		tree = os.path.join(OUTDIR, "{GENE}.cleaned.fa.raxml.bestTree")
+	conda:
+		"environment.yml"	
 	shell:
 		"""
 		raxml-ng --model GTR+G --msa {input.seq} --threads {params.THREADS} --force --redo
@@ -112,28 +122,32 @@ rule raxml:
 
 ## RUN BUSTED-E ON ALL BRANCHES##
 rule busted_e:
-    input:
-        seq = rules.clean_fasta.output.seq,
-        tree = rules.raxml.output.tree
-    output:
-        json = os.path.join(OUTDIR, "{GENE}.raxml.BUSTED-E.json"), 
-        fits = os.path.join(OUTDIR, "{GENE}.raxml.BUSTED-E-fit.lf")
-    shell:
-         """
-         {HYPHY} LIBPATH={RES} BUSTED --alignment {input.seq} --tree {input.tree} --srv Yes --starting-points 5 --output {output.json} --error-sink Yes --save-fit {output.fits}
-         """
+	input:
+		seq = rules.clean_fasta.output.seq,
+		tree = rules.raxml.output.tree
+	output:
+		json = os.path.join(OUTDIR, "{GENE}.raxml.BUSTED-E.json"), 
+		fits = os.path.join(OUTDIR, "{GENE}.raxml.BUSTED-E-fit.lf")
+	conda:
+		"environment.yml"	
+	shell:
+		"""
+		{HYPHY} LIBPATH={RES} BUSTED --alignment {input.seq} --tree {input.tree} --srv Yes --starting-points 5 --output {output.json} --error-sink Yes --save-fit {output.fits}
+    	"""
 ###end rule 
 
 rule filter:
-    input:
-        e_json = rules.busted_e.output.json
-    output:
-        json = os.path.join(OUTDIR, "{GENE}.raxml.FILTER.json"), 
-        seq = os.path.join(OUTDIR, "{GENE}.raxml.FILTER.fas")
-    shell:
-         """
-         {HYPHY} LIBPATH={RES} error-filter {input.e_json} --output {output.seq} --output-json {output.json}
-         """
+	input:
+		e_json = rules.busted_e.output.json
+	output:
+		json = os.path.join(OUTDIR, "{GENE}.raxml.FILTER.json"), 
+		seq = os.path.join(OUTDIR, "{GENE}.raxml.FILTER.fas")
+	conda:
+		"environment.yml"	
+	shell:
+		"""
+		{HYPHY} LIBPATH={RES} error-filter {input.e_json} --output {output.seq} --output-json {output.json}
+		"""
 ###end rule 
 
 #---------------------------------------------------------------------------- 
@@ -143,40 +157,46 @@ rule filter:
 
 ## CLEAN TRAITS FOR BUSTED-PH##
 rule clean_trait:
-    input:
-        trait = os.path.join(TRAIT_DIRECTORY, "{GENE}." + TRAIT_EXT)
-    output:
-        trait = os.path.join(OUTDIR, "{GENE}.cleaned.txt")
-    shell:
-         """
-         python scripts/clean-trait.py {input.trait} {output.trait}
-         """
+	input:
+		trait = os.path.join(TRAIT_DIRECTORY, "{GENE}." + TRAIT_EXT)
+	output:
+		trait = os.path.join(OUTDIR, "{GENE}.cleaned.txt")
+	conda:
+		"environment.yml"	
+	shell:
+		"""
+		python scripts/clean-trait.py {input.trait} {output.trait}
+		"""
 ###end rule 
 
 ## RUN LABEL TREES FOR BUSTED-PH##
 rule label_tree:
-    input:
-        trait = rules.clean_trait.output.trait,
-        tree = rules.raxml.output.tree
-    output:
-        tree = os.path.join(OUTDIR, "{GENE}.raxml.labeled.nwk")
-    shell:
-         """
-         {HYPHY} LIBPATH={RES} {LAB_bf} --tree {input.tree} --list {input.trait} --output {output.tree} 
-         """
+	input:
+		trait = rules.clean_trait.output.trait,
+		tree = rules.raxml.output.tree
+	output:
+		tree = os.path.join(OUTDIR, "{GENE}.raxml.labeled.nwk")
+	conda:
+		"environment.yml"	
+	shell:
+		"""
+		{HYPHY} LIBPATH={RES} {LAB_bf} --tree {input.tree} --list {input.trait} --output {output.tree} 
+		"""
 ###end rule 
 
 rule busted_ph:
-    input:
-        tree = rules.label_tree.output.tree,
-        seq = rules.filter.output.seq								########### UNCOMMENT THIS LINE IF USING FILTERED FASTA
-        #seq = rules.clean_fasta.output.seq							########### UNCOMMENT THIS LINE IF USING UNFILTERED FASTA
-    output:
-        json = os.path.join(OUTDIR, "{GENE}.raxml.BUSTEDPH.json")
-    shell:
-         """
-         {HYPHY} LIBPATH={RES} {BUSTED_PH_BF} --alignment {input.seq} --tree {input.tree} --output {output.json} --branches Foreground
-         """
+	input:
+		tree = rules.label_tree.output.tree,
+		seq = rules.filter.output.seq								########### UNCOMMENT THIS LINE IF USING FILTERED FASTA
+		#seq = rules.clean_fasta.output.seq							########### UNCOMMENT THIS LINE IF USING UNFILTERED FASTA
+	output:
+		json = os.path.join(OUTDIR, "{GENE}.raxml.BUSTEDPH.json")
+	conda:
+		"environment.yml"	
+	shell:
+		"""
+		{HYPHY} LIBPATH={RES} {BUSTED_PH_BF} --alignment {input.seq} --tree {input.tree} --output {output.json} --branches Foreground
+		"""
 ###end rule 
 
 #---------------------------------------------------------------------------- 
@@ -185,15 +205,17 @@ rule busted_ph:
 
 
 rule meme:
-    input:
-        seq = rules.filter.output.seq,
-        tree = rules.raxml.output.tree
-    output:
-        json = os.path.join(OUTDIR, "{GENE}.raxml.MEME.json") 
-    shell:
-         """
-         {HYPHY} LIBPATH={RES} MEME --alignment {input.seq} --tree {input.tree} --srv Yes --starting-points 5 --output {output.json} 
-         """
+	input:
+		seq = rules.filter.output.seq,
+		tree = rules.raxml.output.tree
+	output:
+		json = os.path.join(OUTDIR, "{GENE}.raxml.MEME.json") 
+	conda:
+		"environment.yml"	
+	shell:
+		"""
+		{HYPHYMPI} LIBPATH={RES} MEME --alignment {input.seq} --tree {input.tree} --srv Yes --starting-points 5 --output {output.json} 
+		"""
 
 
 ###end rule
@@ -203,15 +225,17 @@ rule meme:
 
 
 rule absrel:
-    input:
-        seq = rules.filter.output.seq,
-        tree = rules.raxml.output.tree
-    output:
-        json = os.path.join(OUTDIR, "{GENE}.raxml.ABSREL.json")
-    shell:
-         """
-         {HYPHY} LIBPATH={RES} ABSREL --alignment {input.seq} --tree {input.tree} --srv Yes --starting-points 5 --output {output.json} 
-         """
+	input:
+		seq = rules.filter.output.seq,
+		tree = rules.raxml.output.tree
+	output:
+		json = os.path.join(OUTDIR, "{GENE}.raxml.ABSREL.json")
+	conda:
+		"environment.yml"	
+	shell:
+		"""
+		{HYPHYMPI} LIBPATH={RES} ABSREL --alignment {input.seq} --tree {input.tree} --srv Yes --starting-points 5 --output {output.json} 
+		"""
 
 
 ###end rule
@@ -221,15 +245,17 @@ rule absrel:
 
 
 rule contrast_fel:
-    input:
-        seq = rules.filter.output.seq,
-        tree = rules.label_tree.output.tree,
-    output:
-        json = os.path.join(OUTDIR, "{GENE}.raxml.contrast-fel.json")
-    shell:
-         """
-         {HYPHY} LIBPATH={RES} CONTRAST-FEL --alignment {input.seq} --tree {input.tree} --srv Yes --starting-points 5 --output {output.json} --branch-set Foreground
-         """
+	input:
+		seq = rules.filter.output.seq,
+		tree = rules.label_tree.output.tree,
+	output:
+		json = os.path.join(OUTDIR, "{GENE}.raxml.contrast-fel.json")
+	conda:
+		"environment.yml"	
+	shell:
+		"""
+		{HYPHYMPI} LIBPATH={RES} CONTRAST-FEL --alignment {input.seq} --tree {input.tree} --srv Yes --starting-points 5 --output {output.json} --branch-set Foreground
+		"""
 
 
 ###end rule
@@ -239,15 +265,17 @@ rule contrast_fel:
 
 
 rule relax:
-    input:
-        seq = rules.filter.output.seq,
-        tree = rules.label_tree.output.tree
-    output:
-        json = os.path.join(OUTDIR, "{GENE}.raxml.RELAX.json"), 
-    shell:
-         """
-         {HYPHY} LIBPATH={RES} RELAX --alignment {input.seq} --tree {input.tree} --srv Yes --starting-points 5 --output {output.json} --test Foreground
-         """
+	input:
+		seq = rules.filter.output.seq,
+		tree = rules.label_tree.output.tree
+	output:
+		json = os.path.join(OUTDIR, "{GENE}.raxml.RELAX.json"), 
+	conda:
+		"environment.yml"	
+	shell:
+		"""
+		{HYPHYMPI} LIBPATH={RES} RELAX --alignment {input.seq} --tree {input.tree} --srv Yes --starting-points 5 --output {output.json} --test Foreground
+		"""
 
 
 ###end rule
